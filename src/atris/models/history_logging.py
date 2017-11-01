@@ -8,7 +8,7 @@ import threading
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import (
-    post_save, pre_delete, class_prepared, m2m_changed
+    post_save, post_delete, class_prepared, m2m_changed
 )
 from django.utils import six
 
@@ -77,13 +77,14 @@ class HistoryLogging(object):
         # The HistoricalRecord object will be discarded,
         # so the signal handlers can't use weak references.
         post_save.connect(self.post_save, sender=sender, weak=False)
-        pre_delete.connect(self.pre_delete, sender=sender, weak=False)
+        post_delete.connect(self.pre_delete, sender=sender, weak=False)
         self._set_m2m_changed_signal_receiver(sender)
         self.excluded_fields_names = getattr(
             sender, self.excluded_fields_param_name, [])
         self._set_interested_related_fields(sender)
         setattr(sender._meta, 'history_logging', self)
         setattr(sender, self.manager_name, HistoryManager())
+        import pdb; pdb.set_trace()
 
     def _set_m2m_changed_signal_receiver(self, sender):
         for field in sender._meta.local_many_to_many:
@@ -345,6 +346,11 @@ class HistoricalRecordGenerator(object):
 
     def generate_history_for_interested_object(self, interested_object,
                                                removed_data):
+        # Log any previous changes done to the interested object
+        # before logging the changes done to the observed object
+        # in order to prevent history loss.
+        history_logging = interested_object._meta.history_logging
+        history_logging.create_historical_record(interested_object, '~')
         instance_class_name = self.instance.__class__.__name__
         instance_name = instance_class_name.lower()
         history_message = '{action}d {object_type}'.format(

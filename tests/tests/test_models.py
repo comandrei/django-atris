@@ -1309,6 +1309,44 @@ class TestRelatedHistory(TestCase):
         self.assertEqual(url_on_episode_history[2].additional_data['link'],
                          'Created Link')
 
+    def test_creating_observed_object_before_interested_object_is_saved_generates_3_history_records_for_interested(  # noqa
+            self):
+        # arrange
+        # TODO: try with shows and seasons - must set `seasons` as excluded in show and show as interested in season.
+        # See if other tests are affected.
+        show = Show.objects.create(title='Mercy Street', description='')
+        # act
+        show.description = 'Something new'
+        season = Season.objects.create(title='Season 1',
+                                       description='',
+                                       show=show)
+        show.title = 'Mercy Street - Season 1'
+        show.save()
+        # assert
+        show_updates_history = self._history_for(Show, '~')
+        self.assertEqual(show_updates_history.count(), 3)
+        show_title_changed = show_updates_history[0]
+        self.assertEqual(show_title_changed.history_diff, ['title'])
+        self.assertEqual(show_title_changed.data,
+                         {'title': 'Mercy Street - Season 1',
+                          'description': 'Something new',
+                          'specials': '',
+                          'links': '',
+                          'id': str(show.pk)})
+        show_season_created = show_updates_history[1]
+        season_created_history = self._history_for(Season, '+')[0]
+        self.assertEqual(show_season_created.related_field_history,
+                         season_created_history)
+        show_description_changed = show_updates_history[2]
+        self.assertEqual(show_description_changed.history_diff,
+                         ['description'])
+        self.assertEqual(show_description_changed.data,
+                         {'title': 'Mercy Street',
+                          'description': 'Something new',
+                          'specials': '',
+                          'links': '',
+                          'id': str(show.pk)})
+
     @staticmethod
     def _history_for(class_, type_=None):
         result = HistoricalRecord.objects.filter(

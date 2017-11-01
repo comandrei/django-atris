@@ -46,15 +46,17 @@ class Show(models.Model):
     description = models.CharField(max_length=1000)
     links = GenericRelation('Link')
 
-    history = HistoryLogging()
+    excluded_fields = ['seasons']
+    history = HistoryLogging(excluded_fields_param_name='excluded_fields')
 
 
 class Season(models.Model):
     title = models.CharField(max_length=100)
     description = models.CharField(max_length=1000)
-    show = models.ForeignKey(Show)
+    show = models.ForeignKey(Show, related_name='seasons')
 
-    history = HistoryLogging()
+    interested_related_fields = ['show']
+    history = HistoryLogging(interested_related_fields='interested_related_fields')
 
 
 class Actor(models.Model):
